@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ArchaeoQuest</title>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+</head>
+<body>
+    <py-config>
+        packages = ["folium"]
+    </py-config>
+    <div id="pyscript-output"></div>
+
+    <script type="py" terminal>
+        from pathlib import Path
+        from js import document, alert
+        from pyodide.http import pyfetch as fetch
+        from pyscript import display
+        from js import prompt
+        import folium
+        import json
+        import time
+        
+        response_understood = True
+
+        # Define the starting location and zoom level for your map
+        # Example: San Francisco
+        def ask_info():
+            global latitude, longitude, name, zoom_start, image_path, description
+            correct_latitude = True
+            correct_longitude = True
+            latitude = int(prompt("What is the latitude of the location?"))
+            if latitude < -90 or latitude > 90:
+                correct_latitude = False
+            while correct_latitude == False:
+                alert("latitude not found")
+                latitude = int(prompt("What is the latitude of the of the location?"))
+                if not latitude < -90 and not latitude > 90:
+                    correct_latitude = True
+            longitude = int(prompt("What is the longitude of the location?"))
+            if longitude < -180 or longitude > 180:
+                correct_latitude = False
+            while correct_longitude == False:
+                alert("longitude not found")
+                longitude = int(prompt("What is the longitude of the of the location?"))
+                if not longitude < -180 and not longitude > 180:
+                    correct_longitude = True
+
+            alert("For the next questions answer pass if you don't want to \
+            have that section in your map.")
+            description = prompt("What do you want the description to be?")
+            dating = prompt("What is estimated age of the site?")
+            date_discovered = prompt("When was this site discovered?")
+            site_type = prompt("What environment is the site located in?")
+            climate = prompt("What is the climate/daily weather of the site?")
+            links = prompt("Are there any links related to this site?")
+            cost_hours = prompt("When is this site open and what is the cost of entering the site?")
+            dangers = prompt("What are some dangers that you can find at the site/what dangers are the site facing, and what should people be\
+            careful of?")
+            archaeologists = prompt("Who were some of the major people part of this site")
+            name = prompt("What is the name of your location?")
+            zoom_start = 12
+            image_path = prompt("What is the image link/path(type pass for no image)")
+
+        async def load_json_file(url):
+            global json_data
+            response = await fetch(url)
+            json_data = await response.json()
+            print("JSON data from URL:", json_data)
+           
+        async def load_json_function():
+            await load_json_file(json_file)
+
+        def json_info():
+            json_file = prompt('What is your json file? Answer in this format: json\
+        file.json')
+
+            try:
+                load_json_function()
+            except FileNotFoundError:
+                alert('File not found')
+
+        
+        def load_point():
+            # Create a Folium Map object
+            global m
+            m = folium.Map(location=[latitude, longitude], zoom_start=zoom_start)
+
+            # Add a marker to the map (optional)
+            # Example: Golden Gate Bridge
+            folium.Marker(
+                location=[latitude, longitude],
+                popup=folium.Popup(html, max_width=200),
+                tooltip="Click for info"
+            ).add_to(m)
+
+        def show_map_link():    
+            output_file_ask = prompt("what do you want to call your map?")
+            output_file = f"{output_file_ask}.html"
+            m.save(output_file)
+
+            print(f"Interactive map saved to {output_file}")
+            print("Click on the link above to download the map")
+            
+            map_html = m.get_root().render()
+            with open(output_file, 'r') as f:
+                map_content = f.read()
+            
+            link = document.createElement("a")
+            link.href = "data:text/html;charset=utf-8," + map_content
+            link.download = output_file
+            link.innerText = f"Download your map: {output_file}"
+            document.getElementById("pyscript-output").appendChild(link)
+
+        csv_or_questions = prompt("Do you want to prompt a json file, or enter data(not \
+        recomended for lots of points), type in 'json' for a json file or 'prompt data' \
+        for prompting data.")
+
+        if 'prompt data' in csv_or_questions.lower():
+            ask_info()
+        elif 'json' in csv_or_questions.lower():
+            json_info()
+        else:
+            alert("prompt not understood")
+            response_understood = False
+
+        if 'prompt data' in csv_or_questions.lower():
+            p = Path(image_path)
+            if p.exists():
+                html = f"""
+                <figure>
+                    <img src="{image_path}" width="150" height"150"
+                    <br>
+                    <figcaption>{name}</figcaption>
+                </figure>
+        """
+            elif image_path == 'pass':
+                html = f"""
+                <figure>
+                    <figcaption>{name}</figcaption>
+                </figure>
+        """
+            else:
+                alert("Image path not found")
+                html = f"""
+                <figure>
+                    <figcaption>{name}</figcaption>
+                </figure>
+        """
+                load_point()
+        elif 'json' in csv_or_questions.lower():
+            m = folium.Map(location=json_data['location'], zoom_start=12)
+            folium.Marker(
+                location=json_data['location'],
+                popup=json_data['pop_up'],
+                tooltip=json_data['tooltip']
+            ).add_to(m)
+            folium.Marker(
+                location=json_data['location2'],
+                popup=json_data['pop_up2'],
+                tooltip=json_data['tooltip2']
+            ).add_to(m)
+           
+        if response_understood == True:
+            show_map_link()
+
+    </script>
+</body>
+</html>
